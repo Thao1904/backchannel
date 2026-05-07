@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { CameraTracker } from "@/components/chat/CameraTracker";
 import type {
   AdminSettings,
@@ -37,6 +37,14 @@ import {
 type SettingsSection = "data" | "camera" | "cast" | "prompts";
 
 export default function ChatSettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ChatSettingsContent />
+    </Suspense>
+  );
+}
+
+function ChatSettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hasHydrated, setHasHydrated] = useState(false);
