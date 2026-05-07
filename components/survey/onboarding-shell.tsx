@@ -28,7 +28,7 @@ export function OnboardingShell({
 }: OnboardingShellProps) {
   return (
     <main className="grain flex min-h-screen select-none items-center justify-center px-5 py-28 sm:px-8 sm:py-32">
-      <div className="flex w-full max-w-[1200px] flex-col items-center">
+      <div className="mobile-scale-shell flex w-full max-w-[1200px] flex-col items-center sm:w-full sm:max-w-[1200px] sm:scale-100">
         <div className="relative mx-auto flex h-[min(86vh,900px)] min-h-[760px] w-full max-w-[860px] flex-col rounded-[40px] border-[3px] border-black/80 bg-[var(--panel)] px-6 py-6 shadow-[var(--paper-shadow)] sm:px-10 sm:py-8">
           <ProgressIndicator current={currentStep} total={totalSteps} />
           <div className="soft-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden pr-1">

@@ -891,22 +891,23 @@ export function ChatShell() {
 
   return (
     <main className="mx-auto flex h-[100svh] max-w-5xl flex-col overflow-hidden px-3 py-3 sm:min-h-screen sm:h-auto sm:px-6 sm:py-5">
-      <ChatHeader
-        adminSettings={adminSettings}
-        onCipherChange={setCameraCipherMode}
-        onCameraStateChange={setCameraState}
-        trackingEnabled={!hasReplyAccess}
-        onPauseToggle={() => setIsAutoChatPaused((current) => !current)}
-        isPauseVisible={isAutoChatRunning}
-        isPaused={isAutoChatPaused}
-        providerBadge={providerBadge}
-      />
+      <div className="mobile-scale-shell flex min-h-0 flex-1 flex-col sm:w-full sm:scale-100">
+        <ChatHeader
+          adminSettings={adminSettings}
+          onCipherChange={setCameraCipherMode}
+          onCameraStateChange={setCameraState}
+          trackingEnabled={!hasReplyAccess}
+          onPauseToggle={() => setIsAutoChatPaused((current) => !current)}
+          isPauseVisible={isAutoChatRunning}
+          isPaused={isAutoChatPaused}
+          providerBadge={providerBadge}
+        />
 
-      <section className="mono-board mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] px-3 py-3 sm:mt-6 sm:h-[calc(100vh-11rem)] sm:min-h-[760px] sm:max-h-[1100px] sm:rounded-[2.4rem] sm:px-5 sm:py-6 md:px-8">
+        <section className="mono-board mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[2rem] px-3 py-3 sm:mt-6 sm:h-[calc(100vh-11rem)] sm:min-h-[760px] sm:max-h-[1100px] sm:rounded-[2.4rem] sm:px-5 sm:py-6 md:px-8">
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
           <div className="sticky top-0 z-20 -mx-3 mb-3 flex items-center justify-center bg-[linear-gradient(180deg,#efefea_0%,#ebeae4_82%,rgba(235,234,228,0)_100%)] px-3 pb-3 pt-1 sm:static sm:mx-0 sm:mb-5 sm:bg-transparent sm:px-0 sm:pb-0 sm:pt-0">
             <div>
-              <h2 className="text-center font-['Arial_Black','Impact','sans-serif'] text-[2rem] font-black uppercase tracking-[-0.09em] text-[#151515] sm:text-5xl">
+              <h2 className="text-center font-['Arial_Black','Impact','sans-serif'] text-[2rem] font-black uppercase tracking-[0.02em] text-[#151515] sm:text-5xl sm:tracking-[0.01em]">
                 Backchannel
               </h2>
               <div className="mt-1 flex items-center justify-center gap-2">
@@ -947,7 +948,8 @@ export function ChatShell() {
             />
           </div>
         </div>
-      </section>
+        </section>
+      </div>
 
       {showJoinPrompt ? (
         <CenterModal onReset={resetChatSession}>

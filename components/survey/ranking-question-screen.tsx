@@ -1,6 +1,14 @@
 "use client";
 
-import { DragEvent, useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  DragEvent,
+  PointerEvent,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import type { ReactNode } from "react";
 import { getDeviceDefinition, moveItem } from "@/lib/survey-prototype/backchannel-data";
 import { DeviceIllustration } from "@/components/survey/device-illustration";
@@ -24,8 +32,16 @@ export function RankingQuestionScreen({
   const positionsRef = useRef(new Map<DeviceType, DOMRect>());
   const movedRef = useRef<DeviceType | null>(null);
   const draggedRef = useRef<DeviceType | null>(null);
+  const pointerDragStartedRef = useRef(false);
+  const pointerTimeoutRef = useRef<number | null>(null);
   const hasAnimatedInRef = useRef(false);
   const [draggingDevice, setDraggingDevice] = useState<DeviceType | null>(null);
+  const prefersTouchDrag = useMemo(
+    () =>
+      typeof window !== "undefined" &&
+      window.matchMedia("(pointer: coarse)").matches,
+    [],
+  );
 
   useEffect(() => {
     document.documentElement.classList.toggle("drag-select-lock", Boolean(draggingDevice));
@@ -140,7 +156,12 @@ export function RankingQuestionScreen({
   }
 
   function handleDragEnd() {
+    if (pointerTimeoutRef.current !== null) {
+      window.clearTimeout(pointerTimeoutRef.current);
+      pointerTimeoutRef.current = null;
+    }
     draggedRef.current = null;
+    pointerDragStartedRef.current = false;
     setDraggingDevice(null);
   }
 
@@ -168,11 +189,74 @@ export function RankingQuestionScreen({
     handleDragEnd();
   }
 
+  function reorderToward(targetDevice: DeviceType) {
+    const draggedDevice = draggedRef.current;
+    if (!draggedDevice || draggedDevice === targetDevice) {
+      return;
+    }
+
+    const fromIndex = devices.indexOf(draggedDevice);
+    const toIndex = devices.indexOf(targetDevice);
+    if (fromIndex === -1 || toIndex === -1) {
+      return;
+    }
+
+    movedRef.current = draggedDevice;
+    onChange(moveItem(devices, fromIndex, toIndex));
+  }
+
+  function handlePointerDown(
+    event: PointerEvent<HTMLDivElement>,
+    device: DeviceType,
+  ) {
+    if (!prefersTouchDrag) {
+      return;
+    }
+
+    draggedRef.current = device;
+    pointerDragStartedRef.current = false;
+    event.currentTarget.setPointerCapture(event.pointerId);
+
+    pointerTimeoutRef.current = window.setTimeout(() => {
+      pointerDragStartedRef.current = true;
+      setDraggingDevice(device);
+    }, 180);
+  }
+
+  function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
+    if (!prefersTouchDrag || !pointerDragStartedRef.current) {
+      return;
+    }
+
+    event.preventDefault();
+
+    const target = document
+      .elementFromPoint(event.clientX, event.clientY)
+      ?.closest<HTMLElement>("[data-ranking-device]");
+
+    const targetDevice = target?.dataset.rankingDevice as DeviceType | undefined;
+    if (targetDevice) {
+      reorderToward(targetDevice);
+    }
+  }
+
+  function handlePointerUp(event: PointerEvent<HTMLDivElement>) {
+    if (!prefersTouchDrag) {
+      return;
+    }
+
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+
+    handleDragEnd();
+  }
+
   return (
     <div className="flex flex-1 flex-col pt-10">
       <StepHeader title={title} description={description} />
       <p className="mx-auto mt-3 text-[10px] font-bold uppercase tracking-[0.14em] text-[#b06d95]">
-        Drag to reorder
+        {prefersTouchDrag ? "Hold and move to reorder" : "Drag to reorder"}
       </p>
       <div className="soft-scrollbar mx-auto mt-8 flex w-full max-w-[560px] select-none flex-col gap-3 overflow-auto pr-1">
         {devices.map((device, index) => {
@@ -180,17 +264,23 @@ export function RankingQuestionScreen({
           return (
             <div
               key={device}
+              data-ranking-device={device}
               ref={(node) => {
                 if (node) itemRefs.current.set(device, node);
                 else itemRefs.current.delete(device);
               }}
-              draggable
+              draggable={!prefersTouchDrag}
               onDragStart={(event) => handleDragStart(event, device)}
               onDragEnd={handleDragEnd}
               onDragOver={handleDragOver}
               onDrop={() => handleDrop(device)}
+              onPointerDown={(event) => handlePointerDown(event, device)}
+              onPointerMove={handlePointerMove}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               className={[
-                "flex cursor-grab items-center gap-4 rounded-[24px] border-[4px] border-black bg-[#ffc7e8] px-4 py-4 will-change-transform hover:bg-[var(--acid)] hover:shadow-[0_6px_0_rgba(255,79,192,0.24)] active:cursor-grabbing",
+                "flex items-center gap-4 rounded-[24px] border-[4px] border-black bg-[#ffc7e8] px-4 py-4 will-change-transform hover:bg-[var(--acid)] hover:shadow-[0_6px_0_rgba(255,79,192,0.24)]",
+                prefersTouchDrag ? "cursor-default touch-none" : "cursor-grab active:cursor-grabbing",
                 draggingDevice === device
                   ? "scale-[1.015] rotate-[1deg] shadow-[0_6px_0_rgba(255,79,192,0.24)]"
                   : "transition-transform duration-300",
