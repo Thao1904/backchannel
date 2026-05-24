@@ -71,6 +71,7 @@ export function ChatShell() {
   const [typingSpeaker, setTypingSpeaker] = useState<string>("Vault");
   const [isSending, setIsSending] = useState(false);
   const [isAutoChatRunning, setIsAutoChatRunning] = useState(false);
+  const [hasAutoChatCompleted, setHasAutoChatCompleted] = useState(false);
   const [isAutoChatPaused, setIsAutoChatPaused] = useState(false);
   const [personas, setPersonas] = useState<PersonaCard[]>([]);
   const [cameraCipherMode, setCameraCipherMode] = useState(false);
@@ -246,6 +247,8 @@ export function ChatShell() {
   useEffect(() => {
     if (
       !hasHydrated ||
+      !hasAutoChatCompleted ||
+      isAutoChatRunning ||
       remainingReplyLockMs > 0 ||
       hasJoinedChat ||
       hasDismissedJoinPrompt
@@ -262,9 +265,11 @@ export function ChatShell() {
       window.clearTimeout(timer);
     };
   }, [
+    hasAutoChatCompleted,
     hasDismissedJoinPrompt,
     hasHydrated,
     hasJoinedChat,
+    isAutoChatRunning,
     remainingReplyLockMs,
   ]);
 
@@ -601,6 +606,7 @@ export function ChatShell() {
     autoChatRunIdRef.current = runId;
     setCurrentSessionId(nextSessionId);
     setIsAutoChatRunning(true);
+    setHasAutoChatCompleted(false);
     setIsAutoChatPaused(false);
     let resolvedPersonas: PersonaCard[] = [];
 
@@ -828,6 +834,7 @@ export function ChatShell() {
       if (autoChatRunIdRef.current === runId) {
         setIsTyping(false);
         setIsAutoChatRunning(false);
+        setHasAutoChatCompleted(true);
       }
     }
   }
