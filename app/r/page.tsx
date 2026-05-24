@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { SurveyCollectionPayload } from "@/lib/chat-types";
+
+const FREE_USER_MESSAGE_LIMIT = 8;
 
 interface RoomMessage {
   id: string;
@@ -26,6 +28,20 @@ export default function RoomReviewPage() {
   const [surveySummary, setSurveySummary] = useState("");
   const [survey, setSurvey] = useState<SurveyCollectionPayload | null>(null);
   const [roomCode, setRoomCode] = useState("");
+  const [roomStatus, setRoomStatus] = useState("");
+  const [userMessageCount, setUserMessageCount] = useState(0);
+  const [chatInput, setChatInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const transcriptEndRef = useRef<HTMLDivElement | null>(null);
+
+  const canChat =
+    status === "ready" &&
+    roomStatus === "active" &&
+    userMessageCount < FREE_USER_MESSAGE_LIMIT;
+  const remainingMessages = Math.max(
+    0,
+    FREE_USER_MESSAGE_LIMIT - userMessageCount,
+  );
 
   async function loadRoom() {
     setStatus("loading");
@@ -56,11 +72,22 @@ export default function RoomReviewPage() {
       return;
     }
 
-    setMessages(Array.isArray(data.messages) ? data.messages : []);
+    applyRoomData(data);
+  }
+
+  function applyRoomData(data: any) {
+    const nextMessages = Array.isArray(data.messages) ? data.messages : [];
+    setMessages(nextMessages);
     const nextSurvey = (data.survey as StoredSurveySession | null)
       ?.survey_payload;
     setSurvey(nextSurvey ?? null);
     setRoomCode(data.room?.room_code ?? "");
+    setRoomStatus(data.room?.status ?? "");
+    setUserMessageCount(
+      typeof data.room?.user_message_count === "number"
+        ? data.room.user_message_count
+        : nextMessages.filter((item: RoomMessage) => item.role === "user").length,
+    );
     setSurveySummary(
       data.survey?.owner_name
         ? `${data.survey.owner_name} · ${data.room?.user_message_count ?? 0} messages`
@@ -69,10 +96,47 @@ export default function RoomReviewPage() {
     setStatus("ready");
   }
 
+  async function sendMessage() {
+    const trimmed = chatInput.trim();
+
+    if (!trimmed || isSending || !canChat) {
+      return;
+    }
+
+    setIsSending(true);
+    setMessage("");
+    setChatInput("");
+
+    const response = await fetch("/api/rooms", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        joinCode: joinCode.trim(),
+        userMessage: trimmed,
+      }),
+    });
+    const data = await response.json();
+
+    if (!response.ok || data.error) {
+      setMessage(data.error ?? "Could not send your message.");
+      setIsSending(false);
+      return;
+    }
+
+    applyRoomData(data);
+    setIsSending(false);
+  }
+
   useEffect(() => {
     setStatus("idle");
     setMessage("");
   }, []);
+
+  useEffect(() => {
+    transcriptEndRef.current?.scrollIntoView({ block: "end" });
+  }, [messages.length]);
 
   return (
     <main className="min-h-screen bg-[#111] px-4 py-6 text-[#f7f7f3]">
@@ -116,7 +180,22 @@ export default function RoomReviewPage() {
               {surveySummary}
               {roomCode ? ` · ${roomCode}` : ""}
             </p>
-            {survey ? <SurveyStatsPanel survey={survey} /> : null}
+            {canChat ? (
+              <div className="mt-5 rounded-[1.5rem] border border-white/16 bg-white/[0.06] p-4">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-white/42">
+                  Live chat
+                </p>
+                <h2 className="mt-2 text-2xl font-black uppercase tracking-[-0.04em]">
+                  Join the argument
+                </h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-white/55">
+                  {remainingMessages} free messages left. This room becomes a
+                  review page after the free messages are used.
+                </p>
+              </div>
+            ) : survey ? (
+              <SurveyStatsPanel survey={survey} />
+            ) : null}
             <div className="mt-5 flex-1 space-y-3 overflow-y-auto pb-8">
               {messages.map((item) => (
                 <article
@@ -133,7 +212,51 @@ export default function RoomReviewPage() {
                   <p className="mt-2 text-sm font-semibold leading-6">{item.content}</p>
                 </article>
               ))}
+              <div ref={transcriptEndRef} />
             </div>
+            {status === "ready" ? (
+              <div className="sticky bottom-0 -mx-4 bg-[linear-gradient(180deg,rgba(17,17,17,0)_0%,#111_18%,#111_100%)] px-4 pb-2 pt-4">
+                {canChat ? (
+                  <div className="rounded-[1.25rem] border border-white/18 bg-black p-3">
+                    <textarea
+                      value={chatInput}
+                      onChange={(event) => setChatInput(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.shiftKey) {
+                          event.preventDefault();
+                          void sendMessage();
+                        }
+                      }}
+                      rows={3}
+                      placeholder="Ask the room something..."
+                      className="w-full resize-none bg-transparent text-sm font-semibold leading-6 text-white outline-none placeholder:text-white/32"
+                    />
+                    <div className="mt-3 flex items-center justify-between gap-3">
+                      <span className="text-[10px] font-black uppercase tracking-[0.14em] text-white/38">
+                        {remainingMessages} left
+                      </span>
+                      <button
+                        type="button"
+                        onClick={sendMessage}
+                        disabled={isSending || chatInput.trim().length === 0}
+                        className="rounded-full border border-white bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-black disabled:cursor-not-allowed disabled:opacity-45"
+                      >
+                        {isSending ? "Sending..." : "Send"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="rounded-[1rem] border border-white/12 bg-white/[0.06] px-4 py-3 text-center text-xs font-black uppercase tracking-[0.14em] text-white/48">
+                    This room is now saved for review.
+                  </p>
+                )}
+                {message ? (
+                  <p className="mt-3 text-center text-sm font-semibold leading-6 text-white/58">
+                    {message}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         )}
       </section>
