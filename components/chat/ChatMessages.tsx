@@ -18,18 +18,38 @@ export function ChatMessages({
   isTyping,
   typingSpeaker,
 }: ChatMessagesProps) {
+  const scrollRef = useRef<HTMLDivElement | null>(null);
   const endRef = useRef<HTMLDivElement | null>(null);
+  const latestMessageText = messages[messages.length - 1]?.content ?? "";
 
   useEffect(() => {
     if (!adminSettings.autoScroll) {
       return;
     }
 
-    endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [adminSettings.autoScroll, isTyping, messages]);
+    const scrollToBottom = () => {
+      const container = scrollRef.current;
+      if (container) {
+        container.scrollTop = container.scrollHeight;
+      }
+      endRef.current?.scrollIntoView({ behavior: "auto", block: "end" });
+    };
+
+    scrollToBottom();
+    const frame = window.requestAnimationFrame(scrollToBottom);
+    const timer = window.setTimeout(scrollToBottom, 80);
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+      window.clearTimeout(timer);
+    };
+  }, [adminSettings.autoScroll, isTyping, latestMessageText, messages.length]);
 
   return (
-    <div className="vault-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-0.5 py-1.5 sm:px-1 sm:py-2">
+    <div
+      ref={scrollRef}
+      className="vault-scrollbar flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-0.5 py-1.5 sm:px-1 sm:py-2"
+    >
       {messages.length === 0 ? (
         <div className="flex h-full min-h-[320px] flex-col items-start justify-center px-6 py-10">
           <div className="max-w-[280px] rounded-[1.35rem] border-[2px] border-[#2b2b2b] bg-[#f7f7f3] px-6 py-5 text-left text-[#181818]">

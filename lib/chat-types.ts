@@ -79,14 +79,19 @@ export interface GeneratedChatCache {
 export interface ConversationArchiveRecord {
   id: string;
   sessionId: string;
+  roomCode?: string;
+  joinCode?: string;
+  roomUrl?: string;
   surveySignature: string;
   createdAt: number;
   updatedAt: number;
   owner: SurveyOwnerContext;
+  survey?: SurveyCollectionPayload;
   provider: "rules" | "gemini" | "openrouter";
   model: string;
   personas: PersonaCard[];
   messages: ChatMessage[];
+  status?: "active" | "completed" | "abandoned" | "locked_free_limit" | "reset";
 }
 
 export interface DeviceFeatureMap {

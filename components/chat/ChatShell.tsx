@@ -46,6 +46,11 @@ import { ChatMessages } from "@/components/chat/ChatMessages";
 import { ChatInput } from "@/components/chat/ChatInput";
 import { TypingIndicator } from "@/components/chat/TypingIndicator";
 
+const FREE_USER_MESSAGE_LIMIT = 8;
+const JOIN_PROMPT_DELAY_MS = 0;
+const FINAL_SCREEN_RESET_MS = 2 * 60 * 1000;
+const IDLE_RESET_MS = 4 * 60 * 1000;
+
 export function ChatShell() {
   const [providerBadge, setProviderBadge] = useState<{
     label: "Gemini" | "OpenRouter" | "Fallback";
@@ -80,6 +85,13 @@ export function ChatShell() {
   const [hasJoinedChat, setHasJoinedChat] = useState(false);
   const [declinedJoinChat, setDeclinedJoinChat] = useState(false);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [roomCode, setRoomCode] = useState("");
+  const [joinCode, setJoinCode] = useState("");
+  const [showFinalQr, setShowFinalQr] = useState(false);
+  const [finalReason, setFinalReason] = useState<"limit" | "idle" | "reset" | null>(
+    null,
+  );
+  const [lastActivityAt, setLastActivityAt] = useState(Date.now());
   const autoChatRunIdRef = useRef(0);
   const isAutoChatPausedRef = useRef(false);
 
@@ -122,9 +134,31 @@ export function ChatShell() {
       model: providerBadge.detail,
       personas,
       messages,
+      roomCode,
+      joinCode,
+      roomUrl: buildRoomUrl(),
+      survey,
+      status: showFinalQr
+        ? finalReason === "limit"
+          ? "locked_free_limit"
+          : finalReason === "idle"
+            ? "abandoned"
+            : "reset"
+        : "active",
     };
 
     upsertConversationArchive(archiveRecord);
+    if (roomCode && joinCode) {
+      void fetch("/api/kiosk-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(archiveRecord),
+      }).catch(() => {
+        // Supabase persistence is optional; local archive remains the fallback.
+      });
+    }
   }, [
     currentSessionId,
     documents,
@@ -133,6 +167,10 @@ export function ChatShell() {
     personas,
     providerBadge.detail,
     providerBadge.label,
+    roomCode,
+    joinCode,
+    showFinalQr,
+    finalReason,
     adminSettings.conversationPromptTemplate,
     adminSettings.language,
     adminSettings.ownerName,
@@ -208,7 +246,6 @@ export function ChatShell() {
   useEffect(() => {
     if (
       !hasHydrated ||
-      isAutoChatRunning ||
       remainingReplyLockMs > 0 ||
       hasJoinedChat ||
       hasDismissedJoinPrompt
@@ -219,7 +256,7 @@ export function ChatShell() {
     const timer = window.setTimeout(() => {
       setShowJoinPrompt(true);
       setHasDismissedJoinPrompt(true);
-    }, 1200);
+    }, JOIN_PROMPT_DELAY_MS);
 
     return () => {
       window.clearTimeout(timer);
@@ -228,8 +265,51 @@ export function ChatShell() {
     hasDismissedJoinPrompt,
     hasHydrated,
     hasJoinedChat,
-    isAutoChatRunning,
     remainingReplyLockMs,
+  ]);
+
+  useEffect(() => {
+    if (!hasHydrated || !showFinalQr) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      resetChatSession();
+    }, FINAL_SCREEN_RESET_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasHydrated, showFinalQr]);
+
+  useEffect(() => {
+    if (
+      !hasHydrated ||
+      showFinalQr ||
+      showJoinPrompt ||
+      showJoinQr ||
+      showFeedbackQr ||
+      showWelcomeModal
+    ) {
+      return;
+    }
+
+    const remaining = Math.max(0, IDLE_RESET_MS - (Date.now() - lastActivityAt));
+    const timer = window.setTimeout(() => {
+      finishSession("idle");
+    }, remaining);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [
+    hasHydrated,
+    lastActivityAt,
+    showFeedbackQr,
+    showFinalQr,
+    showJoinPrompt,
+    showJoinQr,
+    showWelcomeModal,
   ]);
 
   const onlineCount = useMemo(
@@ -267,7 +347,44 @@ export function ChatShell() {
   function resetChatSession() {
     saveMessages([]);
     clearGeneratedChatCache();
-    window.location.href = "/chat";
+    window.location.href = "/";
+  }
+
+  function touchActivity() {
+    setLastActivityAt(Date.now());
+  }
+
+  function makeRoomCode() {
+    return Math.random().toString(36).slice(2, 8).toUpperCase();
+  }
+
+  function makeJoinCode() {
+    return String(Math.floor(100000 + Math.random() * 900000));
+  }
+
+  function buildRoomUrl() {
+    if (typeof window === "undefined") {
+      return "/r";
+    }
+
+    const configuredBase = process.env.NEXT_PUBLIC_REALCHAT_BASE_URL?.trim();
+    const base = configuredBase || window.location.origin;
+    return `${base.replace(/\/$/, "")}/r`;
+  }
+
+  function buildQrImageUrl(value: string) {
+    const encoded = encodeURIComponent(value);
+    return `https://api.qrserver.com/v1/create-qr-code/?size=260x260&margin=14&data=${encoded}`;
+  }
+
+  function finishSession(reason: "limit" | "idle" | "reset") {
+    touchActivity();
+    setFinalReason(reason);
+    setShowJoinPrompt(false);
+    setShowJoinQr(false);
+    setShowFeedbackQr(false);
+    setShowWelcomeModal(false);
+    setShowFinalQr(true);
   }
 
   function createSurveySignature(survey: SurveyCollectionPayload) {
@@ -501,6 +618,11 @@ export function ChatShell() {
     setMessages([]);
     setInput("");
     setPersonas([]);
+    setRoomCode(makeRoomCode());
+    setJoinCode(makeJoinCode());
+    setShowFinalQr(false);
+    setFinalReason(null);
+    setLastActivityAt(Date.now());
     setReplyUnlockedAt(Date.now() + adminSettings.userReplyDelaySeconds * 1000);
     setShowJoinPrompt(false);
     setShowJoinQr(false);
@@ -712,17 +834,23 @@ export function ChatShell() {
 
   async function handleSend() {
     const trimmed = input.trim();
+    const userMessageCount = messages.filter((message) => message.role === "user").length;
 
     if (
       !trimmed ||
       isSending ||
       isAutoChatRunning ||
       remainingReplyLockMs > 0 ||
-      !hasJoinedChat
+      !hasJoinedChat ||
+      userMessageCount >= FREE_USER_MESSAGE_LIMIT
     ) {
+      if (userMessageCount >= FREE_USER_MESSAGE_LIMIT) {
+        finishSession("limit");
+      }
       return;
     }
 
+    touchActivity();
     const nextUserMessage = createMessage("user", trimmed, "You");
     setMessages((current) => [...current, nextUserMessage]);
     setInput("");
@@ -856,6 +984,11 @@ export function ChatShell() {
           await wait(betweenRepliesDelay);
         }
       }
+
+      const nextUserMessageCount = userMessageCount + 1;
+      if (nextUserMessageCount >= FREE_USER_MESSAGE_LIMIT) {
+        finishSession("limit");
+      }
     } finally {
       setIsTyping(false);
       setTypingSpeaker("Vault");
@@ -864,6 +997,12 @@ export function ChatShell() {
   }
 
   const countdownSeconds = Math.ceil(remainingReplyLockMs / 1000);
+  const userMessageCount = messages.filter((message) => message.role === "user").length;
+  const remainingFreeMessages = Math.max(
+    0,
+    FREE_USER_MESSAGE_LIMIT - userMessageCount,
+  );
+  const activeRoomUrl = buildRoomUrl();
   const hasReplyAccess =
     hasJoinedChat &&
     remainingReplyLockMs <= 0 &&
@@ -877,17 +1016,23 @@ export function ChatShell() {
     !hasJoinedChat ||
     showJoinPrompt ||
     showJoinQr ||
-    showWelcomeModal;
+    showWelcomeModal ||
+    showFinalQr ||
+    remainingFreeMessages <= 0;
   const copy = getChatCopy(adminSettings.language);
   const lockedReason = isAutoChatRunning
-    ? copy.autoGossipRunning
+    ? countdownSeconds > 0
+      ? `Hide/cover your eyes so the devices won't notice you staring at them. ${copy.replyUnlocksIn(countdownSeconds)}`
+      : copy.autoGossipRunning
     : countdownSeconds > 0
-      ? copy.replyUnlocksIn(countdownSeconds)
+      ? `Hide/cover your eyes so the devices won't notice you staring at them. ${copy.replyUnlocksIn(countdownSeconds)}`
       : !hasJoinedChat
         ? adminSettings.language === "en"
           ? "Join Backchannel to reply"
           : "Tham gia Backchannel de tra loi"
-      : undefined;
+        : remainingFreeMessages <= 0
+          ? "Free chat limit reached"
+          : undefined;
 
   return (
     <main className="mx-auto flex h-[100svh] max-w-5xl flex-col overflow-hidden px-3 py-3 sm:min-h-screen sm:h-auto sm:px-6 sm:py-5">
@@ -941,11 +1086,19 @@ export function ChatShell() {
             ) : null}
             <ChatInput
               value={input}
-              onChange={setInput}
+              onChange={(value) => {
+                setInput(value);
+                touchActivity();
+              }}
               onSend={handleSend}
               disabled={isSending || isReplyLocked}
               lockedReason={lockedReason}
             />
+            {hasJoinedChat && !showFinalQr ? (
+              <p className="mt-2 text-center text-[10px] font-bold uppercase tracking-[0.16em] text-[#181818]/45">
+                {remainingFreeMessages} free messages left
+              </p>
+            ) : null}
           </div>
         </div>
         </section>
@@ -963,6 +1116,7 @@ export function ChatShell() {
               <ModalAction
                 label={adminSettings.language === "en" ? "Yes" : "Yes"}
                 onClick={() => {
+                  touchActivity();
                   setShowJoinPrompt(false);
                   setShowJoinQr(true);
                 }}
@@ -970,6 +1124,7 @@ export function ChatShell() {
               <ModalAction
                 label={adminSettings.language === "en" ? "No" : "No"}
                 onClick={() => {
+                  touchActivity();
                   setShowJoinPrompt(false);
                   setDeclinedJoinChat(true);
                   setShowFeedbackQr(true);
@@ -989,23 +1144,40 @@ export function ChatShell() {
                 ? "Scan to join Backchannel"
                 : "Scan de vao Backchannel"}
             </p>
-            <button
-              type="button"
-              onClick={() => {
-                setShowJoinQr(false);
-                setShowWelcomeModal(true);
-                setHasJoinedChat(true);
-                setDeclinedJoinChat(false);
-              }}
-              className="mx-auto mt-6 flex h-56 w-56 items-center justify-center rounded-[1.75rem] border-[2px] border-[#202020] bg-[repeating-linear-gradient(45deg,#111_0px,#111_12px,#2c2c2c_12px,#2c2c2c_24px)] text-xs font-black uppercase tracking-[0.22em] text-white"
-            >
-              QR Placeholder
-            </button>
+            <p className="mx-auto mt-3 max-w-sm text-sm font-bold leading-6 text-[#181818]/62">
+              Scan and enter the code to chat on mobile.
+            </p>
+            <QrPanel
+              roomUrl={activeRoomUrl}
+              joinCode={joinCode}
+              qrImageUrl={buildQrImageUrl(activeRoomUrl)}
+            />
             <p className="mt-3 text-sm font-medium text-[#181818]/60">
               {adminSettings.language === "en"
-                ? "Click the QR placeholder to simulate a successful scan."
-                : "Click vao QR placeholder de gia lap scan thanh cong."}
+                ? "Or use the button below to chat right here."
+                : "Hoac bam nut ben duoi de chat ngay tren may nay."}
             </p>
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              <ModalAction
+                label="Chat on this screen"
+                onClick={() => {
+                  touchActivity();
+                  setShowJoinQr(false);
+                  setShowWelcomeModal(true);
+                  setHasJoinedChat(true);
+                  setDeclinedJoinChat(false);
+                }}
+              />
+              <ModalAction
+                label="Back"
+                inverted
+                onClick={() => {
+                  touchActivity();
+                  setShowJoinQr(false);
+                  setShowJoinPrompt(true);
+                }}
+              />
+            </div>
           </div>
         </CenterModal>
       ) : null}
@@ -1015,16 +1187,19 @@ export function ChatShell() {
           <div className="text-center">
             <p className="text-3xl font-black uppercase tracking-[-0.06em] text-[#181818]">
               {adminSettings.language === "en"
-                ? "Feedback QR"
-                : "Feedback QR"}
+                ? "Save this room"
+                : "Luu phong nay"}
             </p>
-            <div className="mx-auto mt-6 flex h-56 w-56 items-center justify-center rounded-[1.75rem] border-[2px] border-[#202020] bg-[repeating-linear-gradient(45deg,#dad7d0_0px,#dad7d0_12px,#b8b2a8_12px,#b8b2a8_24px)] text-xs font-black uppercase tracking-[0.22em] text-[#111]">
-              QR Placeholder
-            </div>
+            <QrPanel
+              roomUrl={activeRoomUrl}
+              joinCode={joinCode}
+              qrImageUrl={buildQrImageUrl(activeRoomUrl)}
+            />
             <div className="mt-6 flex justify-center">
               <button
                 type="button"
                 onClick={() => {
+                  touchActivity();
                   setShowFeedbackQr(false);
                   setShowJoinQr(true);
                 }}
@@ -1052,6 +1227,7 @@ export function ChatShell() {
               <ModalAction
                 label={adminSettings.language === "en" ? "Enter chat" : "Vao chat"}
                 onClick={() => {
+                  touchActivity();
                   setShowWelcomeModal(false);
                 }}
               />
@@ -1059,7 +1235,75 @@ export function ChatShell() {
           </div>
         </CenterModal>
       ) : null}
+
+      {showFinalQr ? (
+        <CenterModal onReset={resetChatSession}>
+          <div className="text-center">
+            <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#181818]/45">
+              {finalReason === "limit"
+                ? "Free chat limit reached"
+                : finalReason === "idle"
+                  ? "No activity detected"
+                  : "Session saved"}
+            </p>
+            <p className="mt-3 text-3xl font-black uppercase tracking-[-0.06em] text-[#181818]">
+              Want to keep arguing?
+            </p>
+            <p className="mx-auto mt-3 max-w-md text-base font-semibold leading-7 text-[#4a4a4a]">
+              Buy @mee.ltt cafe to keep the AI agent awake. Screenshot this QR
+              and code to review this conversation later.
+            </p>
+            <QrPanel
+              roomUrl={activeRoomUrl}
+              joinCode={joinCode}
+              qrImageUrl={buildQrImageUrl(activeRoomUrl)}
+            />
+            <p className="mt-5 text-xs font-bold uppercase tracking-[0.16em] text-[#181818]/45">
+              This display resets to survey in 2 minutes.
+            </p>
+          </div>
+        </CenterModal>
+      ) : null}
     </main>
+  );
+}
+
+function QrPanel({
+  roomUrl,
+  joinCode,
+  qrImageUrl,
+}: {
+  roomUrl: string;
+  joinCode: string;
+  qrImageUrl: string;
+}) {
+  return (
+    <div className="mx-auto mt-6 max-w-sm">
+      <div className="mx-auto flex h-64 w-64 items-center justify-center rounded-[1.5rem] border-[2px] border-[#202020] bg-white p-3">
+        {roomUrl ? (
+          <img
+            src={qrImageUrl}
+            alt="Backchannel room QR code"
+            className="h-full w-full rounded-[1rem] object-contain"
+          />
+        ) : (
+          <span className="text-xs font-black uppercase tracking-[0.22em] text-[#111]/45">
+            QR loading
+          </span>
+        )}
+      </div>
+      <div className="mt-4 rounded-[1rem] border-[2px] border-[#202020] bg-white px-4 py-3 text-left">
+        <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#181818]/45">
+          Join code
+        </p>
+        <p className="mt-1 text-3xl font-black tracking-[0.14em] text-[#181818]">
+          {joinCode}
+        </p>
+        <p className="mt-3 break-all text-xs font-semibold leading-5 text-[#181818]/55">
+          {roomUrl}
+        </p>
+      </div>
+    </div>
   );
 }
 
