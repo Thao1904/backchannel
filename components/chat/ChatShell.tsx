@@ -1125,7 +1125,8 @@ export function ChatShell() {
                 onClick={() => {
                   touchActivity();
                   setShowJoinPrompt(false);
-                  setShowJoinQr(true);
+                  setHasJoinedChat(true);
+                  setDeclinedJoinChat(false);
                 }}
               />
               <ModalAction
@@ -1134,55 +1135,9 @@ export function ChatShell() {
                   touchActivity();
                   setShowJoinPrompt(false);
                   setDeclinedJoinChat(true);
-                  setShowFeedbackQr(true);
+                  finishSession("reset");
                 }}
                 inverted
-              />
-            </div>
-          </div>
-        </CenterModal>
-      ) : null}
-
-      {showJoinQr ? (
-        <CenterModal onReset={resetChatSession}>
-          <div className="text-center">
-            <p className="text-3xl font-black uppercase tracking-[-0.06em] text-[#181818]">
-              {adminSettings.language === "en"
-                ? "Scan to join Backchannel"
-                : "Scan de vao Backchannel"}
-            </p>
-            <p className="mx-auto mt-3 max-w-sm text-sm font-bold leading-6 text-[#181818]/62">
-              Scan and enter the code to chat on mobile.
-            </p>
-            <QrPanel
-              roomUrl={activeRoomUrl}
-              joinCode={joinCode}
-              qrImageUrl={buildQrImageUrl(activeRoomUrl)}
-            />
-            <p className="mt-3 text-sm font-medium text-[#181818]/60">
-              {adminSettings.language === "en"
-                ? "Or use the button below to chat right here."
-                : "Hoac bam nut ben duoi de chat ngay tren may nay."}
-            </p>
-            <div className="mt-6 flex flex-wrap justify-center gap-3">
-              <ModalAction
-                label="Chat on this screen"
-                onClick={() => {
-                  touchActivity();
-                  setShowJoinQr(false);
-                  setShowWelcomeModal(true);
-                  setHasJoinedChat(true);
-                  setDeclinedJoinChat(false);
-                }}
-              />
-              <ModalAction
-                label="Back"
-                inverted
-                onClick={() => {
-                  touchActivity();
-                  setShowJoinQr(false);
-                  setShowJoinPrompt(true);
-                }}
               />
             </div>
           </div>
@@ -1257,8 +1212,9 @@ export function ChatShell() {
               Want to keep arguing?
             </p>
             <p className="mx-auto mt-3 max-w-md text-base font-semibold leading-7 text-[#4a4a4a]">
-              Buy @mee.ltt cafe to keep the AI agent awake. Screenshot this QR
-              and code to review this conversation later.
+              Buy @mee.ltt cafe to keep the AI agent awake. Scan this QR and
+              enter the code to view device stats, assigned personalities, and
+              this conversation history on mobile.
             </p>
             <QrPanel
               roomUrl={activeRoomUrl}

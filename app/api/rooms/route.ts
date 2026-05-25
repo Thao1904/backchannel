@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { loadRoomByJoinCode, sendRoomMessage } from "@/lib/room-api";
+import { loadRoomByJoinCode } from "@/lib/room-api";
 
 const DEMO_JOIN_CODE = "000000";
 
@@ -120,32 +120,5 @@ export async function GET(request: Request) {
   }
 
   const data = await loadRoomByJoinCode(joinCode);
-  return NextResponse.json(data);
-}
-
-export async function POST(request: Request) {
-  const body = (await request.json()) as {
-    joinCode?: string;
-    userMessage?: string;
-  };
-  const joinCode = body.joinCode?.trim() ?? "";
-  const userMessage = body.userMessage?.trim() ?? "";
-
-  if (!joinCode || !userMessage) {
-    return NextResponse.json(
-      { error: "Missing joinCode or userMessage." },
-      { status: 400 },
-    );
-  }
-
-  if (joinCode === DEMO_JOIN_CODE) {
-    return NextResponse.json({
-      ...demoRoom(),
-      locked: true,
-      error: "Demo room is read-only. Use a live kiosk join code to chat.",
-    });
-  }
-
-  const data = await sendRoomMessage(joinCode, userMessage);
   return NextResponse.json(data);
 }
