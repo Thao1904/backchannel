@@ -25,7 +25,12 @@ function buildQrImageUrl(value: string) {
 export function GlobalKioskOverlay() {
   const pathname = usePathname();
   const feedbackUrl = buildFeedbackUrl();
+  const showFeedback = pathname !== "/chat/transfer";
   const showRestart = pathname === "/" || pathname === "/chat";
+  const feedbackButtonClass =
+    pathname === "/chat"
+      ? "mt-2 flex h-8 items-center justify-center rounded-full border-[2px] border-[#2b2b2b] bg-[#e7e5df] text-[10px] font-black uppercase tracking-[0.12em] text-[#20151b] transition hover:bg-white"
+      : "mt-2 flex h-8 items-center justify-center rounded-full border-[2px] border-[#2b2b2b] bg-[#ff8bc8] text-[10px] font-black uppercase tracking-[0.12em] text-[#20151b] transition hover:bg-white";
 
   function restartExperience() {
     if (typeof window === "undefined") {
@@ -40,19 +45,18 @@ export function GlobalKioskOverlay() {
 
   return (
     <>
-      <aside className="fixed left-4 top-4 z-[100] hidden w-[118px] rounded-[1rem] border-[2px] border-[#2b2b2b] bg-[#ffe1f2]/92 p-2 shadow-[4px_4px_0_rgba(0,0,0,0.16)] backdrop-blur sm:block">
-        <img
-          src={buildQrImageUrl(feedbackUrl)}
-          alt="Feedback QR code"
-          className="h-[98px] w-[98px] rounded-[0.65rem] bg-white object-contain"
-        />
-        <Link
-          href="/feedback"
-          className="mt-2 flex h-8 items-center justify-center rounded-full border-[2px] border-[#2b2b2b] bg-[#ff8bc8] text-[10px] font-black uppercase tracking-[0.12em] text-[#20151b] transition hover:bg-white"
-        >
-          Feedback
-        </Link>
-      </aside>
+      {showFeedback ? (
+        <aside className="fixed left-4 top-4 z-[100] hidden w-[118px] rounded-[1rem] border-[2px] border-[#2b2b2b] bg-[#ffe1f2]/92 p-2 shadow-[4px_4px_0_rgba(0,0,0,0.16)] backdrop-blur sm:block">
+          <img
+            src={buildQrImageUrl(feedbackUrl)}
+            alt="Feedback QR code"
+            className="h-[98px] w-[98px] rounded-[0.65rem] bg-white object-contain"
+          />
+          <Link href="/feedback" className={feedbackButtonClass}>
+            Feedback
+          </Link>
+        </aside>
+      ) : null}
 
       {showRestart ? (
         <button

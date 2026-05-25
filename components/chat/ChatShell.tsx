@@ -1246,9 +1246,10 @@ export function ChatShell() {
               Want to keep arguing?
             </p>
             <p className="mx-auto mt-3 max-w-md text-base font-semibold leading-7 text-[#4a4a4a]">
-              Buy @mee.ltt cafe to keep the AI agent awake. Scan this QR and
-              enter the code to view device stats, assigned personalities, and
-              this conversation history on mobile.
+              Buy @mee.ltt a coffee to keep the AI agent awake.
+              <br />
+              Scan this QR and enter the code to view device stats, assigned
+              personalities, and this conversation history on mobile.
             </p>
             <QrPanel
               roomUrl={activeRoomUrl}
