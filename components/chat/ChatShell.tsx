@@ -290,6 +290,7 @@ export function ChatShell() {
   useEffect(() => {
     if (
       !hasHydrated ||
+      hasJoinedChat ||
       showFinalQr ||
       showJoinPrompt ||
       showJoinQr ||
@@ -309,6 +310,7 @@ export function ChatShell() {
     };
   }, [
     hasHydrated,
+    hasJoinedChat,
     lastActivityAt,
     showFeedbackQr,
     showFinalQr,
@@ -316,6 +318,39 @@ export function ChatShell() {
     showJoinQr,
     showWelcomeModal,
   ]);
+
+  useEffect(() => {
+    if (!hasHydrated || !hasJoinedChat || showFinalQr) {
+      return;
+    }
+
+    const remaining = Math.max(0, IDLE_RESET_MS - (Date.now() - lastActivityAt));
+    const timer = window.setTimeout(() => {
+      finishSession("idle");
+    }, remaining);
+
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [hasHydrated, hasJoinedChat, lastActivityAt, showFinalQr]);
+
+  useEffect(() => {
+    if (!hasHydrated || !hasJoinedChat || showFinalQr) {
+      return;
+    }
+
+    const markActivity = () => {
+      setLastActivityAt(Date.now());
+    };
+
+    window.addEventListener("keydown", markActivity);
+    window.addEventListener("pointerdown", markActivity);
+
+    return () => {
+      window.removeEventListener("keydown", markActivity);
+      window.removeEventListener("pointerdown", markActivity);
+    };
+  }, [hasHydrated, hasJoinedChat, showFinalQr]);
 
   const onlineCount = useMemo(
     () => resolveActiveSurveyPayload().devices.length,
@@ -1126,6 +1161,7 @@ export function ChatShell() {
                   touchActivity();
                   setShowJoinPrompt(false);
                   setHasJoinedChat(true);
+                  setLastActivityAt(Date.now());
                   setDeclinedJoinChat(false);
                 }}
               />
