@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BackchannelProvider } from "@/components/backchannel/provider";
+import { GlobalKioskOverlay } from "@/components/global-kiosk-overlay";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -17,6 +18,7 @@ export default function RootLayout({
       <body>
         <BackchannelProvider>
           {children}
+          <GlobalKioskOverlay />
           <p className="pointer-events-none fixed bottom-3 left-4 z-[100] max-w-[52vw] text-[10px] font-semibold leading-4 text-[#4a4a4a] sm:max-w-lg sm:text-[11px]">
             By participating in this experience, you agree that the interaction,
             provided responses, and generated conversation may be recorded and

@@ -41,10 +41,11 @@ export async function GET(request: Request) {
     return NextResponse.json({ configured: false, sessions: [] });
   }
 
-  const [sessions, rooms, messages] = await Promise.all([
+  const [sessions, rooms, messages, feedback] = await Promise.all([
     readSupabase("survey_sessions?select=*&order=updated_at.desc&limit=200"),
     readSupabase("chat_rooms?select=*&order=updated_at.desc&limit=200"),
     readSupabase("chat_messages?select=*&order=created_at.asc&limit=5000"),
+    readSupabase("feedback?select=*&order=created_at.desc&limit=500"),
   ]);
 
   return NextResponse.json({
@@ -52,5 +53,6 @@ export async function GET(request: Request) {
     sessions: Array.isArray(sessions) ? sessions : [],
     rooms: Array.isArray(rooms) ? rooms : [],
     messages: Array.isArray(messages) ? messages : [],
+    feedback: Array.isArray(feedback) ? feedback : [],
   });
 }

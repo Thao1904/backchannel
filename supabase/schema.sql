@@ -30,6 +30,15 @@ create table if not exists public.chat_messages (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.feedback (
+  id text primary key,
+  rating integer check (rating between 1 and 5),
+  message text,
+  contact text,
+  page_path text,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists chat_rooms_room_code_idx
   on public.chat_rooms(room_code);
 
@@ -39,9 +48,13 @@ create index if not exists chat_rooms_join_code_hash_idx
 create index if not exists chat_messages_room_id_created_at_idx
   on public.chat_messages(room_id, created_at);
 
+create index if not exists feedback_created_at_idx
+  on public.feedback(created_at desc);
+
 alter table public.survey_sessions enable row level security;
 alter table public.chat_rooms enable row level security;
 alter table public.chat_messages enable row level security;
+alter table public.feedback enable row level security;
 
 -- The Next.js API route uses SUPABASE_SERVICE_ROLE_KEY server-side, so public
 -- browser clients do not need direct table access for this kiosk prototype.
