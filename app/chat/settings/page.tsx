@@ -48,6 +48,9 @@ function ChatSettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [hasHydrated, setHasHydrated] = useState(false);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const [adminPassword, setAdminPassword] = useState("");
+  const [adminPasswordError, setAdminPasswordError] = useState("");
   const [activeSection, setActiveSection] = useState<SettingsSection>("data");
   const [adminSettings, setAdminSettings] =
     useState<AdminSettings>(defaultAdminSettings);
@@ -67,6 +70,9 @@ function ChatSettingsContent() {
   );
 
   useEffect(() => {
+    setIsAuthorized(
+      window.sessionStorage.getItem("chat.settingsAdmin") === "true",
+    );
     setAdminSettings(loadAdminSettings());
     setDocuments(loadDocuments());
     setSessionPrompts(loadSessionPrompts());
@@ -159,6 +165,69 @@ function ChatSettingsContent() {
     setEditingPromptId(null);
     setPromptTitle("");
     setPromptContent("");
+  }
+
+  function unlockSettings(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (adminPassword !== "1234") {
+      setAdminPasswordError("Wrong password.");
+      return;
+    }
+
+    window.sessionStorage.setItem("chat.settingsAdmin", "true");
+    setIsAuthorized(true);
+    setAdminPassword("");
+    setAdminPasswordError("");
+  }
+
+  if (hasHydrated && !isAuthorized) {
+    return (
+      <main className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-4 py-5 sm:px-6">
+        <form
+          onSubmit={unlockSettings}
+          className="w-full max-w-sm rounded-[1.5rem] border-[3px] border-[#2b2b2b] bg-[#fff7fb] p-6 text-[#20151b] shadow-[8px_8px_0_rgba(0,0,0,0.18)]"
+        >
+          <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#20151b]/50">
+            Admin settings
+          </p>
+          <h1 className="mt-2 text-3xl font-black uppercase">
+            Enter password
+          </h1>
+          <input
+            value={adminPassword}
+            onChange={(event) => {
+              setAdminPassword(event.target.value);
+              setAdminPasswordError("");
+            }}
+            type="password"
+            autoFocus
+            className="mt-5 w-full rounded-[0.9rem] border-[2px] border-[#2b2b2b] bg-white px-4 py-3 text-base font-black outline-none"
+            placeholder="Password"
+          />
+          {adminPasswordError ? (
+            <p className="mt-3 text-sm font-black text-[#c02660]">
+              {adminPasswordError}
+            </p>
+          ) : null}
+          <div className="mt-5 flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => router.push("/chat")}
+              className="rounded-full border-[2px] border-[#2b2b2b] bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#20151b] transition hover:bg-[#ffd4ec]"
+            >
+              Back
+            </button>
+            <button
+              type="submit"
+              className="rounded-full border-[2px] border-[#2b2b2b] bg-[#ff8bc8] px-4 py-2 text-xs font-black uppercase tracking-[0.12em] text-[#20151b] transition hover:bg-white"
+            >
+              Unlock
+            </button>
+          </div>
+        </form>
+      </main>
+    );
   }
 
   return (
