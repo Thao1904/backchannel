@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 export default function FeedbackPage() {
   const [rating, setRating] = useState(5);
@@ -11,6 +11,18 @@ export default function FeedbackPage() {
     "idle",
   );
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    if (status !== "sent") {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      window.location.href = "/";
+    }, 30000);
+
+    return () => window.clearTimeout(timer);
+  }, [status]);
 
   async function submitFeedback() {
     setStatus("sending");
@@ -110,14 +122,15 @@ export default function FeedbackPage() {
 
           {status === "sent" ? (
             <p className="mt-4 rounded-[1rem] border border-[#2b2b2b]/18 bg-[#ffdaf0] px-4 py-3 text-sm font-black text-[#20151b]">
-              Saved. Thank you for feeding the room.
+              Saved. Thank you for feeding the room. Returning to the survey in
+              30 seconds.
             </p>
           ) : null}
 
           <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
             <Link
               href="/"
-              className="rounded-full border-[2px] border-[#2b2b2b] bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.12em] transition hover:bg-[#ffd4ec]"
+              className="rounded-full border-[2px] border-[#2b2b2b] bg-white px-5 py-3 text-xs font-black uppercase tracking-[0.12em] text-[#000000] transition hover:bg-[#ffd4ec]"
             >
               Back
             </Link>
